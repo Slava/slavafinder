@@ -26,6 +26,7 @@ class SlavaFinder:
         self.createTreeviewFiles()
         self.default_image = self.builder.get_object("PreviewImage")
         self.window = self.builder.get_object("WindowMain")
+        self.current_file = None
 
         self.builder.connect_signals(self)
 
@@ -69,6 +70,7 @@ class SlavaFinder:
         Gtk.main_quit()
 
     def on_TreeviewSelection_changed(self, selection, data=None):
+        self.current_file = None
         model, treeiter = selection.get_selected()
         if treeiter is None:
             return
@@ -86,6 +88,13 @@ class SlavaFinder:
         model, treeiter = selection.get_selected()
         if treeiter is None:
             return
+
+        # if it is same file do rename
+        if treeiter == self.current_file:
+            print 'yeah'
+
+        # update current selection
+        self.current_file = treeiter
 
         # ok, get filename and filepath
         filename, filepath = model[treeiter]
@@ -110,6 +119,19 @@ class SlavaFinder:
         else:
             # it will put just 'no image' icon
             self.builder.get_object("PreviewImage").set_from_file(filepath)
+
+    def on_TreeviewFiles_row_activated(self, treeview, path, view_column, user_data=None):
+        treeiter = treeview.get_model().get_iter(path)
+        filename, filepath = treeview.get_model()[treeiter]
+        import subprocess
+        import os
+        import sys
+        if sys.platform.startswith('darwin'):
+            subprocess.call(('open', filepath))
+        elif os.name == 'nt':
+            os.startfile(filepath)
+        elif os.name == 'posix':
+            subprocess.call(('xdg-open', filepath))
 
     def add_folders(self, model, treeiter):
         # remove its subtree
