@@ -1,6 +1,7 @@
 # -*- codeing: utf-8 -*-
 from gi.repository import Gtk
 from gi.repository import GdkPixbuf
+from gi.repository import Gio       # monitor file changes
 import os                           # for files manipulation
 import mimetypes                    # to guess file type
 import time                         # to format time stamp
@@ -29,6 +30,15 @@ class SlavaFinder:
         self.current_file = None
 
         self.builder.connect_signals(self)
+        self.init_monitor()
+
+    def init_monitor(self):
+        # define folder monitor
+        self.monitor = Gio.file_new_for_path(self.current_path).monitor_directory(0, None)
+        self.monitor.connect("changed", self.directory_changed)
+
+    def directory_changed(self, monitor, file1, file2, evt_type):
+        self.update_current_files()
 
     def createTreeviewFiles(self):
         self.treeviewfiles = self.builder.get_object("TreeviewFiles")
@@ -74,8 +84,12 @@ class SlavaFinder:
         model, treeiter = selection.get_selected()
         if treeiter is None:
             return
+
         self.current_folder, self.current_path = model[treeiter]
         self.update_current_files()
+
+        # reinit monitoring files
+        self.init_monitor()
 
     def on_Treeview_row_expanded(self, treeview, treeiter, path, date=None):
         if not self.temp:
