@@ -218,6 +218,7 @@
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
                         <signal name="row-activated" handler="on_TreeviewFiles_row_activated" swapped="no"/>
+                        <signal name="button-release-event" handler="on_TreeviewFiles_button_release_event" swapped="no"/>
                         <child internal-child="selection">
                           <object class="GtkTreeSelection" id="TreeviewFilesSelection">
                             <signal name="changed" handler="on_TreeviewFilesSelection_changed" swapped="no"/>

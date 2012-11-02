@@ -1,6 +1,7 @@
 # -*- codeing: utf-8 -*-
 from gi.repository import Gtk
-from gi.repository import GdkPixbuf
+from gi.repository import Gdk
+from gi.repository import GdkPixbuf  # for preview images load
 from gi.repository import Gio       # monitor file changes
 import os                           # for files manipulation
 import mimetypes                    # to guess file type
@@ -16,7 +17,23 @@ def sizeof_fmt(num):
     return "%3.1f%s" % (num, 'TB')
 
 
-class SlavaFinder:
+class Dialog(Gtk.Dialog):
+
+    def __init__(self, parent, title, message):
+        Gtk.Dialog.__init__(self, title, parent, 0,
+                            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                            Gtk.STOCK_OK, Gtk.ResponseType.OK))
+
+        self.set_default_size(150, 100)
+
+        label = Gtk.Label(message)
+
+        box = self.get_content_area()
+        box.add(label)
+        self.show_all()
+
+
+class SlavaFinder(object):
 
     def __init__(self):
 
@@ -25,6 +42,8 @@ class SlavaFinder:
 
         self.createTreeview()
         self.createTreeviewFiles()
+        self.createContextMenu()
+
         self.default_image = self.builder.get_object("PreviewImage")
         self.window = self.builder.get_object("WindowMain")
         self.current_file = None
@@ -52,6 +71,10 @@ class SlavaFinder:
         column = Gtk.TreeViewColumn("Files in folder:", renderer, text=0)
         self.treeviewfiles.append_column(column)
 
+        # make it editable and renameable
+        renderer.set_property("editable", True)
+        renderer.connect("edited", self.on_file_renamed)
+
     def createTreeview(self):
         self.treeview = self.builder.get_object("Treeview")
         # absolute path to folder and folder name
@@ -76,6 +99,19 @@ class SlavaFinder:
         # I will use it to break recursion! False by default
         self.temp = False
 
+    def createContextMenu(self):
+        self.context_menu = Gtk.Menu()
+
+        # add "move to trash" button
+        move_to_trash_button = Gtk.MenuItem("Move to trash")
+        move_to_trash_button.connect("button_press_event", self.move_current_file_to_trash)
+        self.context_menu.append(move_to_trash_button)
+
+        # add "delete file" button
+        delete_file_button = Gtk.MenuItem("Delete file")
+        delete_file_button.connect("button_press_event", self.delete_current_file)
+        self.context_menu.append(delete_file_button)
+
     def on_WindowMain_destroy(self, widget, data=None):
         Gtk.main_quit()
 
@@ -99,16 +135,16 @@ class SlavaFinder:
             self.temp = False
 
     def on_TreeviewFilesSelection_changed(self, selection,  data=None):
+        self.current_file = None
+
+        # update current file, path, etc
+        self.update_selection(selection)
+
         model, treeiter = selection.get_selected()
+
+        # if nothing is selected, just return
         if treeiter is None:
             return
-
-        # if it is same file do rename
-        if treeiter == self.current_file:
-            print 'yeah'
-
-        # update current selection
-        self.current_file = treeiter
 
         # ok, get filename and filepath
         filename, filepath = model[treeiter]
@@ -147,6 +183,37 @@ class SlavaFinder:
         elif os.name == 'posix':
             subprocess.call(('xdg-open', filepath))
 
+    def on_TreeviewFiles_button_release_event(self, treeview, event, user_data=None):
+        if event.type == Gdk.EventType.BUTTON_RELEASE and event.button == 3 and self.current_file is not None:
+            self.context_menu.popup(None, None, None, None, event.button, event.time)
+            self.context_menu.show_all()
+
+    def on_file_renamed(self, widget, path, text):
+        # you know, we can not rename to empty string
+        if text == "":
+            return
+
+        file_to_change = self.FilesTreeStorage[path]
+        gio_current_file = Gio.file_new_for_path(file_to_change[1])
+
+        # if we want to rename file to same name
+        if file_to_change[0] == text:
+            return
+
+        try:
+            Gio.File.set_display_name(gio_current_file, text, None)
+        except Exception as message:
+            print message
+            return
+
+        self.update_current_files()
+
+    def update_selection(self, selection):
+        model, treeiter = selection.get_selected()
+
+        # update current selection
+        self.current_file = treeiter
+
     def add_folders(self, model, treeiter):
         # remove its subtree
         self.remove_all_children(model, treeiter)
@@ -176,6 +243,22 @@ class SlavaFinder:
         while child is not None:
             model.remove(child)
             child = model.iter_children(treeiter)
+
+    def move_current_file_to_trash(self, menuitem, user_data=None):
+        giofile = Gio.file_new_for_path(self.FilesTreeStorage[self.current_file][1])
+        Gio.File.trash(giofile, None)
+
+    def delete_current_file(self, menuitem, user_data=None):
+        file_for_deletion = self.FilesTreeStorage[self.current_file]
+        giofile = Gio.file_new_for_path(file_for_deletion[1])
+
+        # user should confirm he wants to delete this file
+        dialog = Dialog(self.window, "Delete file " + file_for_deletion[0] + "?", "Are you sure you want to delete file " + file_for_deletion[0] + "? You will not be able to restore it!")
+        response = dialog.run()
+
+        if response == Gtk.ResponseType.OK:
+            Gio.File.delete(giofile, None)
+        dialog.destroy()
 
 
 def main():
