@@ -67,13 +67,9 @@ class SlavaFinder(object):
         # add all current files
         self.update_current_files()
         self.treeviewfiles.set_model(self.FilesTreeStorage)
-        renderer = Gtk.CellRendererText()
-        column = Gtk.TreeViewColumn("Files in folder:", renderer, text=0)
+        self.files_renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Files in folder:", self.files_renderer, text=0)
         self.treeviewfiles.append_column(column)
-
-        # make it editable and renameable
-        renderer.set_property("editable", True)
-        renderer.connect("edited", self.on_file_renamed)
 
     def createTreeview(self):
         self.treeview = self.builder.get_object("Treeview")
@@ -108,9 +104,14 @@ class SlavaFinder(object):
         self.context_menu.append(move_to_trash_button)
 
         # add "delete file" button
-        delete_file_button = Gtk.MenuItem("Delete file")
+        delete_file_button = Gtk.MenuItem("Delete")
         delete_file_button.connect("button_press_event", self.delete_current_file)
         self.context_menu.append(delete_file_button)
+
+        # add "rename file" button
+        rename_file_button = Gtk.MenuItem("Rename")
+        rename_file_button.connect("button_press_event", self.rename_current_file)
+        self.context_menu.append(rename_file_button)
 
     def on_WindowMain_destroy(self, widget, data=None):
         Gtk.main_quit()
@@ -259,6 +260,13 @@ class SlavaFinder(object):
         if response == Gtk.ResponseType.OK:
             Gio.File.delete(giofile, None)
         dialog.destroy()
+
+    def rename_current_file(self, menuitem, user_data=None):
+        # make it editable and renameable
+        self.files_renderer.set_property("editable", True)
+        self.files_renderer.connect("edited", self.on_file_renamed)
+        self.treeviewfiles.set_cursor_on_cell(self.FilesTreeStorage.get_path(self.current_file), self.treeviewfiles.get_column(0), None, True)
+        self.files_renderer.set_property("editable", False)
 
 
 def main():
