@@ -32,6 +32,8 @@ class Dialog(Gtk.Dialog):
         box.add(label)
         self.show_all()
 
+DRAG_ACTION = Gdk.DragAction.COPY
+
 
 class SlavaFinder(object):
 
@@ -71,6 +73,13 @@ class SlavaFinder(object):
         column = Gtk.TreeViewColumn("Files in folder:", self.files_renderer, text=0)
         self.treeviewfiles.append_column(column)
 
+        # Stuff to make Drag and Drop work
+        # this treeview is source
+        self.treeviewfiles.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, [], DRAG_ACTION)
+        # self.treeviewfiles.connect("drag-data-get", self.on_TreeviewFiles_drag_data_get)
+        self.treeviewfiles.drag_source_set_target_list(None)
+        self.treeviewfiles.drag_source_add_text_targets()
+
     def createTreeview(self):
         self.treeview = self.builder.get_object("Treeview")
         # absolute path to folder and folder name
@@ -94,6 +103,13 @@ class SlavaFinder(object):
 
         # I will use it to break recursion! False by default
         self.temp = False
+
+        # Stuff to set up Drag and Drop
+        # this treeview is destination
+        self.treeview.drag_dest_set(Gtk.DestDefaults.ALL, [], DRAG_ACTION)
+        # self.treeview.connect("drag-data-received", self.on_Treeview_drag_data_received)
+        self.treeview.drag_dest_set_target_list(None)
+        self.treeview.drag_dest_add_text_targets()
 
     def createContextMenu(self):
         self.context_menu = Gtk.Menu()
@@ -127,6 +143,21 @@ class SlavaFinder(object):
 
         # reinit monitoring files
         self.init_monitor()
+
+    def on_Treeview_drag_data_received(self, widget, drag_context, x, y, data, info, time, user_data=None):
+        destdir = self.FoldersTreeStorage[widget.get_dest_row_at_pos(x, y)[0]][1]
+        # print "move", data.get_text(), destdir + '/' + data.get_text().split('/')[-1]
+        source_file = Gio.file_new_for_path(data.get_text())
+        dest_file = Gio.file_new_for_path(destdir + '/' + data.get_text().split('/')[-1])
+        # print source_file, dest_file
+
+        try:
+            Gio.File.move(source_file, dest_file, 0, None, None, None)
+        except Exception as message:
+            print message
+            return
+
+        self.update_current_files()
 
     def on_Treeview_row_expanded(self, treeview, treeiter, path, date=None):
         if not self.temp:
@@ -188,6 +219,9 @@ class SlavaFinder(object):
         if event.type == Gdk.EventType.BUTTON_RELEASE and event.button == 3 and self.current_file is not None:
             self.context_menu.popup(None, None, None, None, event.button, event.time)
             self.context_menu.show_all()
+
+    def on_TreeviewFiles_drag_data_get(self, treeview, drag_context, data, info, time, user_data=None):
+        data.set_text(self.FilesTreeStorage[self.current_file][1], -1)
 
     def on_file_renamed(self, widget, path, text):
         # you know, we can not rename to empty string
@@ -266,7 +300,9 @@ class SlavaFinder(object):
         self.files_renderer.set_property("editable", True)
         self.files_renderer.connect("edited", self.on_file_renamed)
         self.treeviewfiles.set_cursor_on_cell(self.FilesTreeStorage.get_path(self.current_file), self.treeviewfiles.get_column(0), None, True)
+        # make it uneditable again :)
         self.files_renderer.set_property("editable", False)
+        self.files_renderer.disconnect("edited")
 
 
 def main():

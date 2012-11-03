@@ -189,6 +189,7 @@
                   <object class="GtkTreeView" id="Treeview">
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
+                    <signal name="drag-data-received" handler="on_Treeview_drag_data_received" swapped="no"/>
                     <signal name="row-expanded" handler="on_Treeview_row_expanded" swapped="no"/>
                     <child internal-child="selection">
                       <object class="GtkTreeSelection" id="TreeviewSelection">
@@ -219,6 +220,7 @@
                         <property name="can_focus">True</property>
                         <signal name="row-activated" handler="on_TreeviewFiles_row_activated" swapped="no"/>
                         <signal name="button-release-event" handler="on_TreeviewFiles_button_release_event" swapped="no"/>
+                        <signal name="drag-data-get" handler="on_TreeviewFiles_drag_data_get" swapped="no"/>
                         <child internal-child="selection">
                           <object class="GtkTreeSelection" id="TreeviewFilesSelection">
                             <signal name="changed" handler="on_TreeviewFilesSelection_changed" swapped="no"/>
